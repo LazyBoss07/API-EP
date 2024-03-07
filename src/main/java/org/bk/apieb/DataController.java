@@ -1,5 +1,7 @@
 package org.bk.apieb;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,52 +14,47 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 @RestController
-@RequestMapping("/demo")
+@RequestMapping("/api")
 public class DataController {
 
     @PostMapping("/receive-data")
-    public ResponseEntity<String> receiveDataFromESP32(@RequestBody String requestData) {
+    public ResponseEntity<String> receiveDataFromESP32(@RequestBody DataModel requestData) {
         // Process the received data from ESP32
         System.out.println("Received data from ESP32: " + requestData);
 
-        // You can process the data here or return a response to ESP32
-        // For now, just acknowledge the receipt of data
+        sendData(requestData);
         return ResponseEntity.ok("Data received successfully");
     }
 
     @PostMapping("/send-data")
-    public ResponseEntity<String> sendData(@RequestBody DataModel dataToSend) {
-        String externalUrl = "http://example.com/external-endpoint";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+    public ResponseEntity<String> sendData(@RequestBody DataModel dataModel) {
+        String targetUrl = "https://bk-eb.netlify.app/update-data";
 
         try {
-            URL url = new URL(externalUrl);
+            // Convert DataModel to JSON stringbbb
+            ObjectMapper objectMapper = new ObjectMapper();
+            String jsonData = objectMapper.writeValueAsString(dataModel);
+
+            // Create connection
+            URL url = new URL(targetUrl);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setDoOutput(true);
 
-            String jsonInputString = "{\"current\": \"" + dataToSend.getCurrent() + "\", \"voltage\": \"" + dataToSend.getVoltage() + "\"}";
+            // Send JSON data
             try (OutputStream os = connection.getOutputStream()) {
-                byte[] input = jsonInputString.getBytes("utf-8");
+                byte[] input = jsonData.getBytes("utf-8");
                 os.write(input, 0, input.length);
             }
 
+            // Get response code
             int responseCode = connection.getResponseCode();
             String responseBody;
             if (responseCode == HttpURLConnection.HTTP_OK) {
-                try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), "utf-8"))) {
-                    StringBuilder response = new StringBuilder();
-                    String responseLine = null;
-                    while ((responseLine = br.readLine()) != null) {
-                        response.append(responseLine.trim());
-                    }
-                    responseBody = response.toString();
-                }
+                responseBody = "JSON sent successfully";
             } else {
-                responseBody = "Failed to send data. Response code: " + responseCode;
+                responseBody = "Failed to send JSON. Response code: " + responseCode;
             }
 
             connection.disconnect();
@@ -65,10 +62,7 @@ public class DataController {
             return ResponseEntity.ok(responseBody);
         } catch (IOException e) {
             e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error occurred while sending data.");
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected error occurred.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error occurred while sending JSON.");
         }
     }
 }
