@@ -28,7 +28,7 @@ public class DataController {
 
     @PostMapping("/send-data")
     public ResponseEntity<String> sendData(@RequestBody DataModel dataModel) {
-        String targetUrl = "https://bk-eb.netlify.app/update-data";
+        String targetUrl = "https://eb-server.vercel.app/receive-data";
 
         try {
             // Convert DataModel to JSON stringbbb
